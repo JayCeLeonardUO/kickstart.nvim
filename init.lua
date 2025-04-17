@@ -322,6 +322,13 @@ require('lazy').setup({
         { '<leader>w', group = '[W]orkspace' },
         { '<leader>t', group = '[T]oggle' },
         { '<leader>h', group = 'Git [H]unk', mode = { 'n', 'v' } },
+        -- Add Harpoon specs:
+        { '<leader>a', name = '[A]dd to Harpoon' },
+        { '<A-1>', name = 'Harpoon Buffer 1' },
+        { '<A-2>', name = 'Harpoon Buffer 2' },
+        { '<A-3>', name = 'Harpoon Buffer 3' },
+        { '<A-4>', name = 'Harpoon Buffer 4' },
+        { '<C-e>', name = 'Harpoon Menu' },
       },
     },
   },
@@ -902,7 +909,7 @@ require('lazy').setup({
     main = 'nvim-treesitter.configs', -- Sets main module to use for opts
     -- [[ Configure Treesitter ]] See `:help nvim-treesitter`
     opts = {
-      ensure_installed = { 'bash', 'c', 'diff', 'html', 'lua', 'luadoc', 'markdown', 'markdown_inline', 'query', 'vim', 'vimdoc' },
+      ensure_installed = { 'python', 'bash', 'c', 'diff', 'html', 'lua', 'luadoc', 'markdown', 'markdown_inline', 'query', 'vim', 'vimdoc' },
       -- Autoinstall languages that are not installed
       auto_install = true,
       highlight = {
@@ -942,7 +949,7 @@ require('lazy').setup({
   --    This is the easiest way to modularize your config.
   --
   --  Uncomment the following line and add your plugins to `lua/custom/plugins/*.lua` to get going.
-  -- { import = 'custom.plugins' },
+  { import = 'custom.plugins' },
   --
   -- For additional information with loading, sourcing and examples see `:help lazy.nvim-🔌-plugin-spec`
   -- Or use telescope!
@@ -969,6 +976,233 @@ require('lazy').setup({
     },
   },
 })
+-- -- Format on save
+-- vim.api.nvim_create_autocmd('BufWritePre', {
+--   callback = function()
+--     vim.lsp.buf.format { async = false }
+--   end,
+-- })
+local cmp = require 'cmp'
+cmp.setup {
+  mapping = cmp.mapping.preset.insert {
+    ['<Tab>'] = cmp.mapping.select_next_item(),
+    ['<S-Tab>'] = cmp.mapping.select_prev_item(),
+    ['<CR>'] = cmp.mapping.confirm { select = true },
+  },
+  -- Rest of your configuration...
+}
+-- Global variable to store your custom command
+vim.g.custom_command = 'cd build && make && ./your_test_executable'
 
--- The line beneath this is called `modeline`. See `:help modeline`
+function ExecuteCustomCommand()
+  -- Save current buffer
+  vim.cmd 'write'
+
+  -- Open terminal in a new tab
+  vim.cmd 'tabnew'
+  vim.cmd('terminal ' .. vim.g.custom_command)
+  vim.cmd 'startinsert'
+end
+
+-- Function to quickly change the custom command
+function ChangeCustomCommand()
+  local new_cmd = vim.fn.input('Enter new command: ', vim.g.custom_command)
+  if new_cmd ~= '' then
+    vim.g.custom_command = new_cmd
+    print('Command updated: ' .. new_cmd)
+  end
+end
+
+vim.keymap.set('n', '<F5>', ExecuteCustomCommand, { noremap = true, desc = 'Run custom command' })
+vim.keymap.set('n', '<F4>', ChangeCustomCommand, { noremap = true, desc = 'Change custom command' })
+-- oh boy
+--
+--
+-- -- Enhanced formatting configuration for C/C++ with clangd using Mason
+
+-- Make sure you have these plugins installed:
+-- - mason.nvim
+-- - mason-lspconfig.nvim
+-- - nvim-lspconfig
+
+-- First, set up Mason and required plugins if you haven't already
+require('mason').setup()
+require('mason-lspconfig').setup {
+  ensure_installed = { 'clangd' }, -- Ensure clangd is installed
+}
+
+-- Create a .clang-format file in your project root if needed
+local function setup_clang_format()
+  -- Define clang-format style options
+  local clang_format_style = {
+    BasedOnStyle = 'Google', -- Base style (options: LLVM, Google, Chromium, Mozilla, WebKit)
+    IndentWidth = 2, -- Number of spaces for indentation
+    TabWidth = 2, -- Tab width
+    UseTab = 'Never', -- Use spaces instead of tabs
+    ColumnLimit = 100, -- Line length limit
+    AllowShortFunctionsOnASingleLine = 'All',
+    AllowShortIfStatementsOnASingleLine = 'true',
+    AllowShortLoopsOnASingleLine = 'true',
+    SortIncludes = 'true', -- Sort includes alphabetically
+    BreakBeforeBraces = 'Attach', -- Attach braces to context
+    AlignAfterOpenBracket = 'Align',
+    AlignConsecutiveAssignments = 'true',
+    AlignConsecutiveDeclarations = 'true',
+    AlignOperands = 'true',
+    AlignTrailingComments = 'true',
+    PointerAlignment = 'Left',
+  }
+
+  -- Convert to YAML format for .clang-format file
+  local clang_format_yaml = '---\n'
+  for key, value in pairs(clang_format_style) do
+    local val_str = type(value) == 'string' and "'" .. value .. "'" or tostring(value)
+    clang_format_yaml = clang_format_yaml .. key .. ': ' .. val_str .. '\n'
+  end
+  clang_format_yaml = clang_format_yaml .. '...\n'
+
+  -- Write to .clang-format file if it doesn't exist
+  local format_file = io.open('.clang-format', 'r')
+  if not format_file then
+    format_file = io.open('.clang-format', 'w')
+    if format_file then
+      format_file:write(clang_format_yaml)
+      format_file:close()
+      print 'Created .clang-format file with enhanced styling options'
+    else
+      print 'Failed to create .clang-format file'
+    end
+  else
+    format_file:close()
+    print '.clang-format already exists, not overwriting'
+  end
+end
+
+-- Clangd on_attach function with enhanced capabilities
+local on_attach = function(client, bufnr)
+  -- Enable format on save for this buffer
+  vim.api.nvim_buf_set_option(bufnr, 'formatexpr', 'v:lua.vim.lsp.formatexpr()')
+
+  -- Add buffer-specific keymaps here
+  local opts = { noremap = true, silent = true, buffer = bufnr }
+  vim.keymap.set('n', '<leader>f', function()
+    vim.lsp.buf.format { async = false }
+  end, opts)
+  vim.keymap.set('n', '<leader>oi', function()
+    vim.lsp.buf.execute_command {
+      command = 'clangd.sortIncludes',
+      arguments = { vim.uri_from_bufnr(0) },
+    }
+  end, { desc = 'Organize Includes', buffer = bufnr })
+end
+
+-- Configure capabilities
+local capabilities = vim.lsp.protocol.make_client_capabilities()
+capabilities.textDocument.completion.completionItem.snippetSupport = true
+
+-- If you're using nvim-cmp, uncomment this to enhance completion capabilities:
+-- capabilities = require('cmp_nvim_lsp').default_capabilities(capabilities)
+
+-- Use Mason to ensure clangd is installed
+require('mason-lspconfig').setup {
+  ensure_installed = { 'clangd' },
+}
+
+-- Configure clangd
+require('lspconfig').clangd.setup {
+  cmd = {
+    'clangd',
+    '--background-index',
+    '--clang-tidy',
+    '--header-insertion=iwyu',
+    '--completion-style=detailed',
+    '--function-arg-placeholders',
+    '--fallback-style=LLVM', -- Add this line
+  },
+  capabilities = capabilities,
+  on_attach = on_attach,
+}
+
+-- Format on save
+vim.api.nvim_create_autocmd('BufWritePre', {
+  pattern = { '*.c', '*.cpp', '*.h', '*.hpp' },
+  callback = function()
+    vim.lsp.buf.format { async = false, timeout_ms = 2000 }
+  end,
+}) -- Optional: Configure gruvbox before setting it
+vim.o.background = 'dark' -- or "light" for light version
+vim.g.gruvbox_contrast_dark = 'medium' -- "soft", "medium", or "hard"
+vim.cmd.colorscheme 'gruvbox'
+
+-- Enable clipboard integration
+vim.opt.clipboard = 'unnamedplus'
+require('neoclip').setup {
+  history = 1000,
+  enable_persistent_history = false,
+  length_limit = 1048576,
+  continuous_sync = false,
+  db_path = vim.fn.stdpath 'data' .. '/databases/neoclip.sqlite3',
+  filter = nil,
+  preview = true,
+  prompt = nil,
+  default_register = '"',
+  default_register_macros = 'q',
+  enable_macro_history = true,
+  content_spec_column = false,
+  disable_keycodes_parsing = false,
+  dedent_picker_display = false,
+  initial_mode = 'insert',
+  on_select = {
+    move_to_front = false,
+    close_telescope = true,
+  },
+  on_paste = {
+    set_reg = false,
+    move_to_front = false,
+    close_telescope = true,
+  },
+  on_replay = {
+    set_reg = false,
+    move_to_front = false,
+    close_telescope = true,
+  },
+  on_custom_action = {
+    close_telescope = true,
+  },
+  keys = {
+    telescope = {
+      i = {
+        select = '<cr>',
+        paste = '<c-p>',
+        paste_behind = '<c-k>',
+        replay = '<c-q>', -- replay a macro
+        delete = '<c-d>', -- delete an entry
+        edit = '<c-e>', -- edit an entry
+        custom = {},
+      },
+      n = {
+        select = '<cr>',
+        paste = 'p',
+        --- It is possible to map to more than one key.
+        -- paste = { 'p', '<c-p>' },
+        paste_behind = 'P',
+        replay = 'q',
+        delete = 'd',
+        edit = 'e',
+        custom = {},
+      },
+    },
+    fzf = {
+      select = 'default',
+      paste = 'ctrl-p',
+      paste_behind = 'ctrl-k',
+      custom = {},
+    },
+  },
+}
+vim.opt.relativenumber = true
+vim.keymap.set('n', '<leader>fy', '<cmd>Telescope neoclip<CR>', { noremap = true, silent = true, desc = 'Clipboard history' })
+vim.keymap.set('n', '<leader>fm', ':Telescope marks<CR>')
+vim.keymap.set('n', '<leader>fb', ':Telescope buffers<CR>')
+vim.opt.foldmethod = 'marker' -- The line beneath this is called `modeline`. See `:help modeline`
 -- vim: ts=2 sts=2 sw=2 et
