@@ -4,25 +4,125 @@
 -- See the kickstart.nvim README for more information
 -- Format on save and linters
 return {
+  -- {
+  --   'hedyhli/outline.nvim',
+  --   config = function()
+  --     -- Key mapping to toggle outline
+  --     vim.keymap.set('n', '<leader>o', '<cmd>Outline<CR>', { desc = 'Toggle Outline' })
+  --
+  --     require('outline').setup {
+  --       -- Basic configuration
+  --       outline_window = {
+  --         position = 'right',
+  --         width = 25,
+  --         relative_width = true,
+  --         auto_close = false,
+  --       },
+  --     }
+  --   end,
+  --   -- Optional: lazy-load the plugin with these triggers
+  --   -- lazy = true,
+  --   -- cmd = { "Outline", "OutlineOpen" },
+  -- },
+  --
+  --
+  -- Add undotree here
   {
-    'hedyhli/outline.nvim',
+    'chentoast/marks.nvim',
     config = function()
-      -- Key mapping to toggle outline
-      vim.keymap.set('n', '<leader>o', '<cmd>Outline<CR>', { desc = 'Toggle Outline' })
+      require('marks').setup {
+        -- whether to map keybinds or not. default true
+        default_mappings = true,
+        -- which builtin marks to show. default {}
+        builtin_marks = { '.', '<', '>', '^' },
+        -- whether movements cycle back to the beginning/end of buffer. default true
+        cyclic = true,
+        -- whether the shada file is updated after modifying uppercase marks. default false
+        force_write_shada = false,
+        -- how often (in ms) to redraw signs. default 150
+        refresh_interval = 250,
+        -- sign priorities for each type of mark - builtin marks, uppercase marks, lowercase marks
+        sign_priority = { lower = 10, upper = 15, builtin = 8, bookmark = 20 },
+        -- disables mark tracking for specific filetypes. default {}
+        excluded_filetypes = {},
+        -- disables mark tracking for specific buftypes. default {}
+        excluded_buftypes = {},
+        -- marks.nvim allows you to configure up to 10 bookmark groups, each with its own
+        -- sign/virttext. Bookmarks can be used to group together positions and quickly move
+        -- across multiple buffers. default sign is '!@#$%^&*()' (from 0 to 9), and
+        -- default virt_text is "".
+        bookmark_0 = {
+          sign = '⚑',
+          virt_text = 'hello world',
+          -- explicitly prompt for a virtual line annotation when setting a bookmark from this group.
+          -- defaults to false.
+          annotate = false,
+        },
+        mappings = {},
+      }
 
-      require('outline').setup {
-        -- Basic configuration
-        outline_window = {
-          position = 'right',
-          width = 25,
-          relative_width = true,
-          auto_close = false,
+      -- Key mappings to show marks
+      vim.keymap.set('n', '<leader>ml', '<cmd>MarksListBuf<cr>', { desc = 'List marks in buffer' })
+      vim.keymap.set('n', '<leader>mL', '<cmd>MarksListGlobal<cr>', { desc = 'List all marks' })
+      vim.keymap.set('n', '<leader>mt', '<cmd>MarksToggleSigns<cr>', { desc = 'Toggle mark signs' })
+    end,
+  },
+  {
+    'utilyre/barbecue.nvim',
+    dependencies = {
+      'SmiteshP/nvim-navic',
+      'nvim-tree/nvim-web-devicons', -- Optional for icons
+    },
+    config = function()
+      require('barbecue').setup {
+        theme = 'auto',
+        include_buftypes = { '' },
+        exclude_filetypes = { 'gitcommit', 'toggleterm' },
+        show_modified = true,
+      }
+    end,
+  },
+  {
+    'mbbill/undotree',
+    config = function()
+      -- Key mapping to toggle undotree
+      vim.keymap.set('n', '<leader>u', '<cmd>UndotreeToggle<CR>', { desc = 'Toggle Undotree' })
+    end,
+    -- Optional: lazy-load the plugin
+    -- lazy = true,
+    -- cmd = { "UndotreeToggle" },
+  },
+  {
+    'stevearc/aerial.nvim',
+    config = function()
+      -- Key mapping to toggle aerial outline
+      vim.keymap.set('n', '<leader>o', '<cmd>AerialToggle<CR>', { desc = 'Toggle Aerial Outline' })
+
+      require('aerial').setup {
+        -- Position the aerial window on the right side
+        layout = {
+          default_direction = 'right',
+          placement = 'edge',
+        },
+        -- Set width similar to your outline.nvim config
+        width = 25,
+        -- Relative width like your outline config
+        relative_width = true,
+        -- Additional recommended settings
+        close_automatic_events = {}, -- Similar to your auto_close = false
+        manage_folds = false,
+        link_folds_to_tree = false,
+        link_tree_to_folds = false,
+        -- Show icons for different symbol types
+        icons = {
+          show = true,
+          default_icon = '󰎤',
         },
       }
     end,
-    -- Optional: lazy-load the plugin with these triggers
+    -- Optional: lazy-load similar to your outline config
     -- lazy = true,
-    -- cmd = { "Outline", "OutlineOpen" },
+    -- cmd = { "AerialToggle", "AerialOpen" },
   },
   {
     'christoomey/vim-tmux-navigator',

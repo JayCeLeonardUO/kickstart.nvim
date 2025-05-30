@@ -419,7 +419,8 @@ require('lazy').setup({
       vim.keymap.set('n', '<leader>sr', builtin.resume, { desc = '[S]earch [R]esume' })
       vim.keymap.set('n', '<leader>s.', builtin.oldfiles, { desc = '[S]earch Recent Files ("." for repeat)' })
       vim.keymap.set('n', '<leader><leader>', builtin.buffers, { desc = '[ ] Find existing buffers' })
-
+      -- Add the marks keymap
+      vim.keymap.set('n', '<leader>sm', builtin.marks, { desc = '[S]earch [M]arks' })
       -- Slightly advanced example of overriding default behavior and theme
       vim.keymap.set('n', '<leader>/', function()
         -- You can pass additional configuration to Telescope to change the theme, layout, etc.
@@ -488,8 +489,7 @@ require('lazy').setup({
       -- (sometimes called LSP servers, but that's kind of like ATM Machine) are standalone
       -- processes that communicate with some "client" - in this case, Neovim!
       --
-      -- LSP provides Neovim with features like:
-      --  - Go to definition
+      -- LSP provides Neovim with features like:      --  - Go to definition
       --  - Find references
       --  - Autocompletion
       --  - Symbol Search
@@ -1006,6 +1006,7 @@ end
 
 -- Function to quickly change the custom command
 function ChangeCustomCommand()
+  vim.g.custom_command = ''
   local new_cmd = vim.fn.input('Enter new command: ', vim.g.custom_command)
   if new_cmd ~= '' then
     vim.g.custom_command = new_cmd
@@ -1104,11 +1105,27 @@ capabilities.textDocument.completion.completionItem.snippetSupport = true
 -- capabilities = require('cmp_nvim_lsp').default_capabilities(capabilities)
 
 -- Use Mason to ensure clangd is installed
+-- Add ZLS to ensure_installed
 require('mason-lspconfig').setup {
-  ensure_installed = { 'clangd' },
+  ensure_installed = { 'clangd', 'zls' }, -- Add 'zls' here
 }
 
--- Configure clangd
+-- -- Configure clangd (your existing code)
+-- require('lspconfig').clangd.setup {
+--   cmd = {
+--     'clangd',
+--     '--background-index',
+--     '--clang-tidy',
+--     '--header-insertion=iwyu',
+--     '--completion-style=detailed',
+--     '--function-arg-placeholders',
+--     '--fallback-style=LLVM',
+--   },
+--   capabilities = capabilities,
+--   on_attach = on_attach,
+-- }
+
+-- Configure clangd with C11 support
 require('lspconfig').clangd.setup {
   cmd = {
     'clangd',
@@ -1117,8 +1134,19 @@ require('lspconfig').clangd.setup {
     '--header-insertion=iwyu',
     '--completion-style=detailed',
     '--function-arg-placeholders',
-    '--fallback-style=LLVM', -- Add this line
+    '--fallback-style=LLVM',
+    '--query-driver=/usr/bin/gcc', -- Help clangd find your compiler
   },
+  capabilities = capabilities,
+  on_attach = on_attach,
+  -- Add init_options for C11 support
+  init_options = {
+    compilationDatabasePath = 'build',
+    fallbackFlags = { '-std=c11', '-fms-extensions' },
+  },
+}
+-- Configure ZLS
+require('lspconfig').zls.setup {
   capabilities = capabilities,
   on_attach = on_attach,
 }
@@ -1205,4 +1233,86 @@ vim.keymap.set('n', '<leader>fy', '<cmd>Telescope neoclip<CR>', { noremap = true
 vim.keymap.set('n', '<leader>fm', ':Telescope marks<CR>')
 vim.keymap.set('n', '<leader>fb', ':Telescope buffers<CR>')
 vim.opt.foldmethod = 'marker' -- The line beneath this is called `modeline`. See `:help modeline`
+
+-- ==========================
+-- costom mark display stuff
+-- ==========================
+
 -- vim: ts=2 sts=2 sw=2 et
+local wk = require 'which-key'
+
+-- Function to get dynamic marks
+local function get_dynamic_marks()
+  local marks = {}
+
+  -- Get buffer-local marks (a-z)
+  local buf_marks = vim.fn.getmarklist(vim.fn.bufnr())
+  for _, mark in ipairs(buf_marks) do
+    if mark.mark:match "^'[a-z]" then
+      local char = mark.mark:sub(2, 2)
+      marks['`' .. char] = { '`' .. char, string.format('Go to mark %s (line %d)', char, mark.pos[2]) }
+      marks["'" .. char] = { "'" .. char, string.format('Go to line with mark %s (line %d)', char, mark.pos[2]) }
+    end
+  end
+
+  -- Get global marks (A-Z)
+  local global_marks = vim.fn.getmarklist()
+  for _, mark in ipairs(global_marks) do
+    if mark.mark:match "^'[A-Z]" then
+      local char = mark.mark:sub(2, 2)
+      local filename = vim.fn.fnamemodify(mark.file or '', ':t')
+      if filename ~= '' then
+        marks['`' .. char] = { '`' .. char, string.format('Global mark %s (%s:%d)', char, filename, mark.pos[2]) }
+        marks["'" .. char] = { "'" .. char, string.format('Global mark %s (%s:%d)', char, filename, mark.pos[2]) }
+      end
+    end
+  end
+
+  -- Built-in marks
+  marks['`<'] = { '`<', 'Start of last visual selection' }
+  marks['`>'] = { '`>', 'End of last visual selection' }
+  marks['`.'] = { '`.', 'Last change position' }
+  marks['`^'] = { '`^', 'Last insert position' }
+  marks['`['] = { '`[', 'Start of last change' }
+  marks['`]'] = { '`]', 'End of last change' }
+
+  marks["'<"] = { "'<", 'Line of start of last visual selection' }
+  marks["'>"] = { "'>", 'Line of end of last visual selection' }
+  marks["'."] = { "'.", 'Line of last change' }
+  marks["'^"] = { "'^", 'Line of last insert' }
+  marks["'["] = { "'[", 'Line of start of last change' }
+  marks["']"] = { "']", 'Line of end of last change' }
+
+  return marks
+end
+
+wk.setup {
+  -- Your existing config...
+
+  triggers = {
+    { '`', mode = 'n' },
+    { "'", mode = 'n' },
+  },
+
+  spec = function()
+    -- This function is called each time which-key is triggered
+    local dynamic_marks = get_dynamic_marks()
+    local specs = {}
+
+    -- Convert to which-key spec format
+    for key, mapping in pairs(dynamic_marks) do
+      table.insert(specs, {
+        key,
+        mapping[1],
+        desc = mapping[2],
+        mode = 'n',
+      })
+    end
+
+    -- Add group headers
+    table.insert(specs, { '`', group = 'Go to mark' })
+    table.insert(specs, { "'", group = 'Go to mark (line)' })
+
+    return specs
+  end,
+}
